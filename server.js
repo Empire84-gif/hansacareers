@@ -18,18 +18,21 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
 
-      callback(new Error("Origin not allowed by CORS"));
-    },
-  })
-);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
+};
 
 app.use(express.json({ limit: "80kb" }));
 
@@ -75,7 +78,9 @@ async function verifyTurnstile(token, ip) {
   return response.json();
 }
 
-app.post("/api/contact", async (req, res) => {
+app.options("/api/contact", cors(corsOptions));
+
+app.post("/api/contact", cors(corsOptions), async (req, res) => {
   try {
     const {
       fullName,
@@ -146,7 +151,9 @@ app.post("/api/contact", async (req, res) => {
 
     const mailSubject =
       safeSubject ||
-      `New Hansa Careers enquiry${safeContactType ? ` — ${safeContactType}` : ""}`;
+      `New Hansa Careers enquiry${
+        safeContactType ? ` — ${safeContactType}` : ""
+      }`;
 
     await transporter.sendMail({
       from: `"Hansa Careers Website" <${
