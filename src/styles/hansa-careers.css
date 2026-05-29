@@ -7936,3 +7936,31 @@ a.hansa-contact-bar__value:hover {
     line-height: 1.5;
   }
 }
+
+/* =========================
+   CONTACT FORM NOTICE
+========================= */
+
+.hansa-contact-form__notice {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  color: var(--hansa-white);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 800;
+  text-align: center;
+}
+
+.hansa-contact-form__notice--success {
+  background: rgba(0, 119, 220, 0.92);
+}
+
+.hansa-contact-form__notice--error {
+  background: rgba(160, 32, 32, 0.92);
+}
+
+.hansa-contact-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}

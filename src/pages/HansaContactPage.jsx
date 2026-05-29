@@ -1,12 +1,16 @@
 // src/pages/HansaContactPage.jsx
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import HansaHeader from "../components/layout/HansaHeader.jsx";
 import HansaFooter from "../components/layout/HansaFooter.jsx";
 import contactCityImage from "../assets/images/contact-city.jpg";
 
 function HansaContactPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState("");
+  const [submitMessage, setSubmitMessage] = useState("");
+
   useEffect(() => {
     const existingScript = document.querySelector(
       'script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]'
@@ -23,7 +27,7 @@ function HansaContactPage() {
     document.body.appendChild(script);
   }, []);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const form = event.currentTarget;
@@ -33,11 +37,66 @@ function HansaContactPage() {
       return;
     }
 
-    alert("Thank you. Your message has been prepared for submission.");
-    form.reset();
+    const formData = new FormData(form);
+    const turnstileToken = formData.get("cf-turnstile-response");
 
-    if (window.turnstile) {
-      window.turnstile.reset();
+    if (!turnstileToken) {
+      setSubmitStatus("error");
+      setSubmitMessage("Please complete the verification before submitting.");
+      return;
+    }
+
+    const payload = {
+      fullName: formData.get("fullName"),
+      email: formData.get("email"),
+      phone: formData.get("phone"),
+      contactType: formData.get("contactType"),
+      message: formData.get("message"),
+      privacyAccepted: formData.get("privacyAccepted") === "on",
+      termsAccepted: formData.get("termsAccepted") === "on",
+      turnstileToken,
+    };
+
+    try {
+      setIsSubmitting(true);
+      setSubmitStatus("");
+      setSubmitMessage("");
+
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Something went wrong.");
+      }
+
+      setSubmitStatus("success");
+      setSubmitMessage(
+        "Thank you. Your message has been sent successfully. We will get back to you as soon as possible."
+      );
+
+      form.reset();
+
+      if (window.turnstile) {
+        window.turnstile.reset();
+      }
+    } catch (error) {
+      setSubmitStatus("error");
+      setSubmitMessage(
+        error.message || "Something went wrong. Please try again."
+      );
+
+      if (window.turnstile) {
+        window.turnstile.reset();
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -81,7 +140,7 @@ function HansaContactPage() {
               </p>
 
               <div className="hansa-contact-details">
-  <div className="hansa-contact-details__item hansa-contact-details__item--wide">
+                <div className="hansa-contact-details__item hansa-contact-details__item--wide">
                   <span>Registered address</span>
                   <p>
                     Harju maakond, Tallinn, Kesklinna linnaosa,
@@ -99,8 +158,6 @@ function HansaContactPage() {
                   <span>VAT EU</span>
                   <p>EE102932869</p>
                 </div>
-
-                
 
                 <div className="hansa-contact-details__item">
                   <span>Email</span>
@@ -166,10 +223,10 @@ function HansaContactPage() {
                     <option value="" disabled>
                       Select option
                     </option>
-                    <option value="candidate">Candidate</option>
-                    <option value="employer">Employer</option>
-                    <option value="business">Business partner</option>
-                    <option value="other">Other</option>
+                    <option value="Candidate">Candidate</option>
+                    <option value="Employer">Employer</option>
+                    <option value="Business partner">Business partner</option>
+                    <option value="Other">Other</option>
                   </select>
                 </label>
               </div>
@@ -181,7 +238,7 @@ function HansaContactPage() {
 
               <div className="hansa-contact-checks">
                 <label className="hansa-contact-check">
-                  <input type="checkbox" name="acceptPrivacy" required />
+                  <input type="checkbox" name="privacyAccepted" required />
                   <span>
                     I confirm that I have read and understood the{" "}
                     <a
@@ -198,7 +255,7 @@ function HansaContactPage() {
                 </label>
 
                 <label className="hansa-contact-check">
-                  <input type="checkbox" name="acceptTerms" required />
+                  <input type="checkbox" name="termsAccepted" required />
                   <span>
                     I have read and accept the{" "}
                     <a
@@ -217,12 +274,26 @@ function HansaContactPage() {
                 <div
                   className="cf-turnstile"
                   data-sitekey="0x4AAAAAACEs7UVKIee4kVYl"
+                  data-theme="light"
                 />
               </div>
 
-              <button type="submit" className="hansa-contact-submit">
-                Submit Request
+              <button
+                type="submit"
+                className="hansa-contact-submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Sending..." : "Submit Request"}
               </button>
+
+              {submitMessage && (
+                <div
+                  className={`hansa-contact-form__notice hansa-contact-form__notice--${submitStatus}`}
+                  role="status"
+                >
+                  {submitMessage}
+                </div>
+              )}
             </form>
           </div>
         </div>
