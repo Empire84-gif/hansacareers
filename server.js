@@ -80,6 +80,14 @@ async function verifyTurnstile(token, ip) {
 
 app.options("/api/contact", cors(corsOptions));
 
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    service: "Hansa Careers API",
+    status: "running",
+  });
+});
+
 app.post("/api/contact", cors(corsOptions), async (req, res) => {
   try {
     const {
@@ -204,6 +212,14 @@ ${ip || "-"}
       message: "Something went wrong. Please try again later.",
     });
   }
+});
+
+
+app.use("/api", (req, res) => {
+  res.status(404).json({
+    ok: false,
+    message: "API route not found.",
+  });
 });
 
 app.use(express.static(path.join(__dirname, "dist")));
