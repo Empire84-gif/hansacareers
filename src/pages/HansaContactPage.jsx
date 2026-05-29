@@ -1,31 +1,90 @@
 // src/pages/HansaContactPage.jsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import HansaHeader from "../components/layout/HansaHeader.jsx";
 import HansaFooter from "../components/layout/HansaFooter.jsx";
 import contactCityImage from "../assets/images/contact-city.jpg";
 
 function HansaContactPage() {
+  const turnstileRef = useRef(null);
+  const turnstileWidgetId = useRef(null);
+
+  const [turnstileToken, setTurnstileToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState("");
   const [submitMessage, setSubmitMessage] = useState("");
 
   useEffect(() => {
+    let isMounted = true;
+    let checkInterval;
+
+    const renderTurnstile = () => {
+      if (!isMounted) return;
+      if (!turnstileRef.current) return;
+      if (!window.turnstile) return;
+      if (turnstileWidgetId.current !== null) return;
+
+      turnstileWidgetId.current = window.turnstile.render(
+        turnstileRef.current,
+        {
+          sitekey: "0x4AAAAAACEs7UVKIee4kVYl",
+          theme: "light",
+          callback(token) {
+            setTurnstileToken(token);
+          },
+          "expired-callback"() {
+            setTurnstileToken("");
+          },
+          "error-callback"() {
+            setTurnstileToken("");
+          },
+        }
+      );
+    };
+
     const existingScript = document.querySelector(
-      'script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]'
+      'script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]'
     );
 
-    if (existingScript) {
-      return;
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src =
+        "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      script.onload = renderTurnstile;
+      document.body.appendChild(script);
+    } else {
+      checkInterval = window.setInterval(() => {
+        if (window.turnstile) {
+          window.clearInterval(checkInterval);
+          renderTurnstile();
+        }
+      }, 100);
     }
 
-    const script = document.createElement("script");
-    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
+    return () => {
+      isMounted = false;
+
+      if (checkInterval) {
+        window.clearInterval(checkInterval);
+      }
+
+      if (window.turnstile && turnstileWidgetId.current !== null) {
+        window.turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
   }, []);
+
+  const resetTurnstile = () => {
+    if (window.turnstile && turnstileWidgetId.current !== null) {
+      window.turnstile.reset(turnstileWidgetId.current);
+    }
+
+    setTurnstileToken("");
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -37,14 +96,13 @@ function HansaContactPage() {
       return;
     }
 
-    const formData = new FormData(form);
-    const turnstileToken = formData.get("cf-turnstile-response");
-
     if (!turnstileToken) {
       setSubmitStatus("error");
       setSubmitMessage("Please complete the verification before submitting.");
       return;
     }
+
+    const formData = new FormData(form);
 
     const payload = {
       fullName: formData.get("fullName"),
@@ -70,6 +128,14 @@ function HansaContactPage() {
         body: JSON.stringify(payload),
       });
 
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          "The contact form service is not responding correctly. Please contact us directly by email at office@hansacareers.ee."
+        );
+      }
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -82,19 +148,14 @@ function HansaContactPage() {
       );
 
       form.reset();
-
-      if (window.turnstile) {
-        window.turnstile.reset();
-      }
+      resetTurnstile();
     } catch (error) {
       setSubmitStatus("error");
       setSubmitMessage(
         error.message || "Something went wrong. Please try again."
       );
 
-      if (window.turnstile) {
-        window.turnstile.reset();
-      }
+      resetTurnstile();
     } finally {
       setIsSubmitting(false);
     }
@@ -271,11 +332,7 @@ function HansaContactPage() {
               </div>
 
               <div className="hansa-contact-turnstile">
-                <div
-                  className="cf-turnstile"
-                  data-sitekey="0x4AAAAAACEs7UVKIee4kVYl"
-                  data-theme="light"
-                />
+                <div ref={turnstileRef} />
               </div>
 
               <button
